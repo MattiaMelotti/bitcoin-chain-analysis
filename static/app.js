@@ -1,0 +1,97 @@
+let cy = null;
+let currentAddr = null;
+
+function isValidBitcoinAddress(addr) {
+  if (!addr) return false;
+  if (/^1[a-km-zA-HJ-NP-Z1-9]{24,33}$/.test(addr)) return true;
+  if (/^3[a-km-zA-HJ-NP-Z1-9]{24,33}$/.test(addr)) return true;
+  if (/^bc1[a-zA-HJ-NP-Z0-9]{39,59}$/.test(addr)) return true;
+  return false;
+}
+
+function setError(msg) {
+  document.getElementById('error-msg').textContent = msg;
+}
+
+function clearError() {
+  document.getElementById('error-msg').textContent = '';
+}
+
+function showSpinner(on) {
+  document.getElementById('spinner').style.display = on ? 'block' : 'none';
+}
+
+function showStats(on) {
+  document.getElementById('stats-section').style.display = on ? 'block' : 'none';
+}
+
+async function search() {
+  const addr = document.getElementById('addr-input').value.trim();
+  clearError();
+  showStats(false);
+
+  if (!isValidBitcoinAddress(addr)) {
+    setError('Formato indirizzo non valido. Supportati: Legacy (1...), P2SH (3...), Bech32 (bc1...)');
+    return;
+  }
+
+  currentAddr = addr;
+  showSpinner(true);
+
+  try {
+    const [statsRes, graphRes] = await Promise.all([
+      fetch(`/api/address/${addr}`),
+      fetch(`/api/address/${addr}/graph`)
+    ]);
+
+    showSpinner(false);
+
+    if (statsRes.status === 404) {
+      setError('Indirizzo non trovato o senza transazioni.');
+      return;
+    }
+    if (statsRes.status === 502) {
+      setError('Servizio temporaneamente non disponibile. Riprova.');
+      return;
+    }
+    if (statsRes.status === 504) {
+      setError('Timeout — riprova tra qualche secondo.');
+      return;
+    }
+    if (!statsRes.ok) {
+      setError('Errore imprevisto. Riprova.');
+      return;
+    }
+
+    const stats = await statsRes.json();
+    const graph = graphRes.ok ? await graphRes.json() : { nodes: [], edges: [] };
+
+    renderStats(stats);
+    renderTable(stats.transactions);
+    renderGraph(graph, addr);
+    showStats(true);
+  } catch (e) {
+    showSpinner(false);
+    setError('Errore di rete. Verifica la connessione.');
+  }
+}
+
+function renderStats(stats) {
+  document.getElementById('stat-balance').textContent = stats.balance_btc.toFixed(8);
+  document.getElementById('stat-received').textContent = stats.total_received_btc.toFixed(8);
+  document.getElementById('stat-sent').textContent = stats.total_sent_btc.toFixed(8);
+  document.getElementById('stat-txcount').textContent = stats.tx_count;
+}
+
+function switchTab(name) {
+  document.querySelectorAll('.tab-btn').forEach((btn, i) => {
+    btn.classList.toggle('active', (i === 0 && name === 'graph') || (i === 1 && name === 'table'));
+  });
+  document.getElementById('tab-graph').classList.toggle('active', name === 'graph');
+  document.getElementById('tab-table').classList.toggle('active', name === 'table');
+  if (name === 'graph' && cy) cy.resize();
+}
+
+document.getElementById('addr-input').addEventListener('keydown', e => {
+  if (e.key === 'Enter') search();
+});
