@@ -95,3 +95,24 @@ function switchTab(name) {
 document.getElementById('addr-input').addEventListener('keydown', e => {
   if (e.key === 'Enter') search();
 });
+
+function renderTable(transactions) {
+  const tbody = document.getElementById('tx-tbody');
+  if (!transactions || transactions.length === 0) {
+    tbody.innerHTML = '<tr><td colspan="4" class="empty-state">Nessuna transazione trovata</td></tr>';
+    return;
+  }
+  tbody.innerHTML = transactions.map(tx => {
+    const date = tx.date
+      ? new Date(tx.date * 1000).toLocaleDateString('it-IT')
+      : 'Non confermata';
+    const shortTxid = tx.txid.slice(0, 8) + '...' + tx.txid.slice(-4);
+    const sign = tx.type === 'received' ? '+' : '-';
+    return `<tr>
+      <td>${date}</td>
+      <td><a class="txid-link" href="https://mempool.space/tx/${tx.txid}" target="_blank" rel="noopener">${shortTxid}</a></td>
+      <td class="amount ${tx.type}">${sign}${tx.amount_btc.toFixed(8)} BTC</td>
+      <td><span class="badge ${tx.type}">${tx.type === 'received' ? 'Ricevuta' : 'Inviata'}</span></td>
+    </tr>`;
+  }).join('');
+}
