@@ -116,3 +116,79 @@ function renderTable(transactions) {
     </tr>`;
   }).join('');
 }
+
+function renderGraph(graphData, centralAddr) {
+  const nodeColors = { central: '#f7931a', sender: '#ef4444', receiver: '#22c55e' };
+  const elements = [];
+
+  graphData.nodes.forEach(n => {
+    elements.push({
+      data: { id: n.id, label: n.label, role: n.role, color: nodeColors[n.role] || '#8b949e' }
+    });
+  });
+
+  graphData.edges.forEach((e, i) => {
+    elements.push({
+      data: {
+        id: `e${i}`,
+        source: e.source,
+        target: e.target,
+        label: e.amount_btc.toFixed(4) + ' BTC'
+      }
+    });
+  });
+
+  if (cy) cy.destroy();
+
+  cy = cytoscape({
+    container: document.getElementById('graph-container'),
+    elements,
+    style: [
+      {
+        selector: 'node',
+        style: {
+          'background-color': 'data(color)',
+          'label': 'data(label)',
+          'color': '#e6edf3',
+          'font-size': '10px',
+          'text-valign': 'bottom',
+          'text-halign': 'center',
+          'text-margin-y': '4px',
+          'width': '40px',
+          'height': '40px',
+          'border-width': '2px',
+          'border-color': '#21262d'
+        }
+      },
+      {
+        selector: `node[id = "${centralAddr}"]`,
+        style: { 'width': '55px', 'height': '55px', 'border-color': '#f7931a', 'border-width': '3px' }
+      },
+      {
+        selector: 'edge',
+        style: {
+          'width': 2,
+          'line-color': '#30363d',
+          'target-arrow-color': '#30363d',
+          'target-arrow-shape': 'triangle',
+          'curve-style': 'bezier',
+          'label': 'data(label)',
+          'font-size': '9px',
+          'color': '#8b949e',
+          'text-rotation': 'autorotate'
+        }
+      }
+    ],
+    layout: { name: 'cose', animate: false, padding: 40 },
+    userZoomingEnabled: true,
+    userPanningEnabled: true
+  });
+
+  cy.on('tap', 'node', evt => {
+    const nodeId = evt.target.id();
+    if (nodeId !== centralAddr) {
+      document.getElementById('addr-input').value = nodeId;
+      search();
+    }
+  });
+}
