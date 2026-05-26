@@ -17,6 +17,39 @@ Inserisci un indirizzo Bitcoin e ottieni istantaneamente:
 
 Nessuna API key richiesta. Nessun database. Funziona tutto in locale.
 
+## Deploy online (gratis)
+
+Per rendere l'app accessibile pubblicamente senza tenerla aperta sul tuo PC, puoi usare uno di questi servizi gratuiti:
+
+### Railway (consigliato — più semplice)
+
+1. Crea un account su [railway.app](https://railway.app)
+2. Clicca **New Project → Deploy from GitHub repo**
+3. Seleziona `bitcoin-chain-analysis`
+4. Railway rileva FastAPI automaticamente e avvia il deploy
+5. Vai su **Settings → Networking → Generate Domain** per ottenere il link pubblico
+
+### Render
+
+1. Crea un account su [render.com](https://render.com)
+2. Clicca **New → Web Service → Connect a repository**
+3. Seleziona `bitcoin-chain-analysis`
+4. Configura:
+   - **Build Command**: `pip install -r requirements.txt`
+   - **Start Command**: `uvicorn main:app --host 0.0.0.0 --port $PORT`
+5. Clicca **Create Web Service** — il link pubblico appare in cima alla pagina
+
+### Fly.io
+
+```bash
+# Installa flyctl: https://fly.io/docs/hands-on/install-flyctl/
+fly auth login
+fly launch          # segui le istruzioni, accetta i default
+fly deploy
+```
+
+---
+
 ## Avvio rapido
 
 ```bash
