@@ -89,3 +89,62 @@ def get_address(addr: str):
         "tx_count": chain["tx_count"],
         "transactions": transactions
     }
+
+
+@app.get("/api/address/{addr}/graph")
+def get_graph(addr: str):
+    try:
+        with httpx.Client(timeout=10.0) as http:
+            txs_resp = http.get(f"{MEMPOOL_BASE}/address/{addr}/txs")
+            txs_resp.raise_for_status()
+            txs_data = txs_resp.json()
+    except httpx.TimeoutException:
+        raise HTTPException(status_code=504, detail="Upstream timeout")
+    except httpx.ConnectError:
+        raise HTTPException(status_code=502, detail="Cannot reach mempool.space")
+    except Exception:
+        raise HTTPException(status_code=502, detail="Upstream error")
+
+    def short_label(a: str) -> str:
+        return a[:8] + "..." + a[-4:] if len(a) > 12 else a
+
+    nodes: dict = {addr: {"id": addr, "role": "central", "label": short_label(addr)}}
+    edges = []
+
+    for tx in txs_data[:10]:
+        input_addrs = [
+            vin["prevout"]["scriptpubkey_address"]
+            for vin in tx.get("vin", [])
+            if "prevout" in vin and "scriptpubkey_address" in vin["prevout"]
+        ]
+        is_incoming = addr not in input_addrs
+
+        if is_incoming:
+            for sender in set(input_addrs):
+                if sender not in nodes:
+                    nodes[sender] = {"id": sender, "role": "sender", "label": short_label(sender)}
+                amount = sum(
+                    vout["value"]
+                    for vout in tx.get("vout", [])
+                    if vout.get("scriptpubkey_address") == addr
+                )
+                edges.append({
+                    "source": sender,
+                    "target": addr,
+                    "amount_btc": satoshi_to_btc(amount),
+                    "txid": tx["txid"]
+                })
+        else:
+            for vout in tx.get("vout", []):
+                receiver = vout.get("scriptpubkey_address")
+                if receiver and receiver != addr:
+                    if receiver not in nodes:
+                        nodes[receiver] = {"id": receiver, "role": "receiver", "label": short_label(receiver)}
+                    edges.append({
+                        "source": addr,
+                        "target": receiver,
+                        "amount_btc": satoshi_to_btc(vout["value"]),
+                        "txid": tx["txid"]
+                    })
+
+    return {"nodes": list(nodes.values()), "edges": edges}

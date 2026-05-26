@@ -74,3 +74,21 @@ def test_address_stats_mempool_unreachable():
     )
     response = client.get("/api/address/bc1qtest2")
     assert response.status_code == 502
+
+
+@respx.mock
+def test_graph_success():
+    respx.get("https://mempool.space/api/address/bc1qtest/txs").mock(
+        return_value=httpx.Response(200, json=MOCK_TXS)
+    )
+    response = client.get("/api/address/bc1qtest/graph")
+    assert response.status_code == 200
+    data = response.json()
+    assert "nodes" in data
+    assert "edges" in data
+    central_nodes = [n for n in data["nodes"] if n["role"] == "central"]
+    assert len(central_nodes) == 1
+    assert central_nodes[0]["id"] == "bc1qtest"
+    assert len(data["edges"]) >= 1
+    assert data["edges"][0]["source"] == "1SenderAddr"
+    assert data["edges"][0]["target"] == "bc1qtest"
